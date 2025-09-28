@@ -1,0 +1,64 @@
+from gradio_client import Client
+import json
+import tempfile
+import os
+
+# 创建客户端实例
+client = Client("https://55f765f839c495fbbc.gradio.live/")
+
+
+# 创建临时JSON文件存储聊天历史
+def create_temp_json_file(content):
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(content, f)
+        return f.name
+
+
+# 初始化聊天历史
+chat_history = []
+
+# 主循环
+while True:
+    user_input = input("您: ")
+    if user_input.lower() in ["退出", "exit", "quit"]:
+        break
+
+    # 创建临时文件
+    history_file = create_temp_json_file(chat_history)
+
+    try:
+        # 调用API - 使用fn_index=0
+        result_file = client.predict(
+            history_file,  # parameter_21: 聊天历史文件
+            user_input,  # parameter_23: 用户输入
+            100,  # parameter_13: 最大生成长度 (10-2048)
+            0.7,  # parameter_14: 温度 (0.01-1)
+            0.9,  # parameter_15: top_p (0.01-1.5)
+            1.0,  # parameter_16: 重复惩罚 (1.0-1.5)
+            fn_index=0  # 指定端点索引
+        )
+
+        # 读取返回的JSON文件
+        if os.path.exists(result_file):
+            with open(result_file, 'r', encoding='utf-8') as f:
+                chat_history = json.load(f)
+
+            # 提取最新回复
+            if chat_history and len(chat_history) > 0:
+                last_exchange = chat_history[-1]
+                if len(last_exchange) > 1:
+                    print(f"AI: {last_exchange[1]}")
+                else:
+                    print("AI: 无回复")
+            else:
+                print("AI: 无回复")
+        else:
+            print("未收到有效回复")
+
+    except Exception as e:
+        print(f"调用API时出错: {e}")
+
+    finally:
+        # 清理临时文件
+        if os.path.exists(history_file):
+            os.unlink(history_file)
